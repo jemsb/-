@@ -1,0 +1,6 @@
+{
+  "name": "Android Volume Tally Counter",
+  "description": "A fully polished, AMOLED-black responsive tally counter designed for Android. Uses physical volume buttons, vibration feedback, clear sound tones, customizable goals, and session history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
