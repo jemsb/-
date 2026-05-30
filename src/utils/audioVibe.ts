@@ -80,6 +80,24 @@ export const playCounterSound = (
   }
 };
 
+// Base64 silent audio source to maintain background state and claim device media focus
+const SILENT_WAV_BASE64 = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA";
+let silentAudioElement: HTMLAudioElement | null = null;
+
+export const startSilentAudioLoop = () => {
+  try {
+    if (!silentAudioElement) {
+      silentAudioElement = new Audio(SILENT_WAV_BASE64);
+      silentAudioElement.loop = true;
+    }
+    silentAudioElement.play().catch(err => {
+      console.warn("Silent audio playback deferred for key interaction:", err);
+    });
+  } catch (err) {
+    console.warn("Silent audio context start failed:", err);
+  }
+};
+
 // Handle native android vibration pattern
 export const triggerVibration = (type: 'up' | 'down' | 'target' | 'reset') => {
   if (!navigator.vibrate) return;
