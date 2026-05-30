@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { playCounterSound, triggerVibration, startSilentAudioLoop } from './utils/audioVibe';
-import { ShieldCheck, Smartphone, Volume2, Vibrate, CheckCircle, HelpCircle } from 'lucide-react';
+import { Smartphone, HelpCircle, X, Check, Volume2, Shield, Info, Keyboard } from 'lucide-react';
 
 export default function App() {
   const [value, setValue] = useState<number>(() => {
@@ -27,9 +27,11 @@ export default function App() {
     }
   });
 
-  // Transient state for hardware volume key routing authorization.
-  // Modern browsers strictly require direct user interaction before claiming audio contexts & MediaSession controls.
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  // Help modal for browser focus instructions and Native Android Manifest integration guidance
+  const [showAndroidGuide, setShowAndroidGuide] = useState<boolean>(false);
+  
+  // Audio state tracking
+  const [audioContextReady, setAudioContextReady] = useState<boolean>(false);
 
   // Sync state to local storage
   useEffect(() => {
@@ -76,10 +78,18 @@ export default function App() {
     decrementRef.current = handleDecrement;
   });
 
+  // Global auto-audio activator on user gestures
+  const initAudioFeedback = () => {
+    if (!audioContextReady) {
+      startSilentAudioLoop();
+      playCounterSound('up', 'sine');
+      triggerVibration('up');
+      setAudioContextReady(true);
+    }
+  };
+
   // --- HARDWARE VOLUME BUTTON CAPTURE ---
   useEffect(() => {
-    if (!isAuthorized) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
       const { key, keyCode } = e;
       const isVolUp = key === 'VolumeUp' || key === 'AudioVolumeUp' || keyCode === 24;
@@ -88,6 +98,13 @@ export default function App() {
       if (isVolUp || isVolDown) {
         e.preventDefault();
         e.stopPropagation();
+        
+        // Auto-initialize sound if not yet triggered by button clicks
+        if (!audioContextReady) {
+          startSilentAudioLoop();
+          setAudioContextReady(true);
+        }
+
         if (isVolUp) {
           incrementRef.current();
         } else {
@@ -115,12 +132,10 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
     };
-  }, [isAuthorized]);
+  }, [audioContextReady]);
 
   // --- METADATA ACTION PROVIDER (MEDIA SESSION API) ---
   useEffect(() => {
-    if (!isAuthorized) return;
-
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -147,15 +162,7 @@ export default function App() {
         } catch (e) {}
       }
     };
-  }, [isAuthorized]);
-
-  // Handle explicit session activation (satisfying browser gesture rules)
-  const handleActivateSession = () => {
-    startSilentAudioLoop();
-    playCounterSound('up', 'sine');
-    triggerVibration('up');
-    setIsAuthorized(true);
-  };
+  }, []);
 
   // Dynamically calculate font size based on value length to prevent overflow across all mobile viewports
   const getFontSize = (val: number) => {
@@ -168,162 +175,222 @@ export default function App() {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-[#090d16] text-white flex flex-col justify-between p-6 select-none touch-none">
+    <div 
+      onClick={initAudioFeedback}
+      className="fixed inset-0 overflow-hidden bg-[#090d16] text-white flex flex-col justify-between p-6 select-none touch-none"
+    >
       
-      {/* High precision deep space ambient backlight elements */}
+      {/* High precision deep space ambient backlit effects */}
       <div className="absolute w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-indigo-500/10 rounded-full blur-[100px] sm:blur-[130px] -top-20 -left-10 pointer-events-none z-0"></div>
       <div className="absolute w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-emerald-500/5 rounded-full blur-[100px] sm:blur-[130px] -bottom-20 -right-10 pointer-events-none z-0"></div>
 
-      <AnimatePresence mode="wait">
-        {!isAuthorized ? (
-          /* HIGH POLISH DEVICE KEYBOARD PERMISSION REQUEST PANEL */
-          <motion.div
-            key="permission-panel"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className="flex-1 flex flex-col justify-center items-center z-30 px-4 w-full"
+      {/* TOP HEADER STEP CONTROLLER & HELP BUTTON */}
+      <header 
+        className="w-full max-w-sm mx-auto flex items-center justify-between gap-3 z-20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 px-4 py-2 bg-white/5 border border-white/10 rounded-2xl shadow-xl backdrop-blur-2xl flex-1 justify-center">
+          <label htmlFor="increment-step-input" className="text-xs font-mono text-white/40 uppercase font-black tracking-widest whitespace-nowrap">
+            Step:
+          </label>
+          <input
+            id="increment-step-input"
+            type="number"
+            value={step}
+            onChange={(e) => {
+              const val = Math.max(1, parseInt(e.target.value) || 1);
+              setStep(val);
+            }}
+            onFocus={(e) => e.target.select()}
+            className="w-14 bg-[#090d16]/60 border border-white/10 text-white font-mono font-black text-center focus:ring-1 focus:ring-white/30 focus:border-white/30 rounded-xl py-1 px-2.5 transition-all outline-none"
+            min="1"
+            title="Increment Step Amount"
+          />
+        </div>
+
+        {/* Dynamic Help & Manifest Guidance trigger */}
+        <button
+          onClick={() => {
+            initAudioFeedback();
+            setShowAndroidGuide(true);
+          }}
+          className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all text-indigo-300 shadow-xl cursor-pointer"
+          title="See Android Permission Manifest & Setup Guide"
+        >
+          <HelpCircle className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* CORE MASSIVE DISPLAY (Absolutely no tap-to-count clicks) */}
+      <main 
+        className="flex-1 flex flex-col justify-center items-center select-none z-10 w-full relative"
+        title="Volume keys active. Ensure window has focus. Click help guide for information."
+      >
+        <div className="absolute inset-0 bg-transparent pointer-events-none" />
+        
+        <div className="flex flex-col items-center justify-center pointer-events-none w-full px-4 text-center">
+          
+          {/* Dynamically clamped, multi-length resilient visual counter box */}
+          <div className="relative h-[25vh] md:h-[35vh] flex items-center justify-center overflow-hidden w-full max-w-full">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={value}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ type: "spring", stiffness: 220, damping: 25 }}
+                style={{ fontSize: getFontSize(value) }}
+                className="absolute font-mono font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.12)] selection:bg-transparent leading-none"
+              >
+                {value}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Tactile Assistive User Cue */}
+          <motion.div 
+            animate={{ opacity: [0.35, 0.7, 0.35] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            className="text-[10px] sm:text-xs font-mono tracking-[0.2em] text-white/35 uppercase font-black text-center mt-6 flex flex-col gap-1"
           >
-            <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
-              {/* Backlit active target element */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
-              
-              <div className="relative z-10 flex flex-col items-center text-center">
-                
-                {/* Physical Device Icon Ring */}
-                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-6 shadow-inner animate-pulse">
-                  <Smartphone className="w-7 h-7 text-indigo-300" />
-                </div>
-                
-                <h2 className="text-xl md:text-2xl font-bold font-sans tracking-tight mb-3">
-                  Hardware Key Access
-                </h2>
-                
-                <p className="text-sm text-white/60 leading-relaxed mb-6 font-sans">
-                  Android secure architectures require explicit permission to route physical volume signals to the page and suppress the system sound overlay.
-                </p>
-
-                {/* Simulated Permission Requirement Guidelines */}
-                <div className="w-full space-y-3 bg-white/5 rounded-2xl p-4 border border-white/5 text-left mb-6 font-mono text-xs text-white/50">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Safe local keyboard routing</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-white/50 shrink-0" />
-                    <span>Silent background audio channel</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Vibrate className="w-4 h-4 text-white/50 shrink-0" />
-                    <span>Haptic vibration lock</span>
-                  </div>
-                </div>
-
-                {/* Glowing Permission Grant Button */}
-                <button
-                  id="btn-grant-permission"
-                  onClick={handleActivateSession}
-                  className="w-full bg-white text-[#090d16] font-bold text-sm uppercase py-4 rounded-2xl cursor-pointer hover:bg-zinc-100 transition-all duration-200 flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(255,255,255,0.15)] active:scale-95 select-none"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Grant Permission
-                </button>
-
-              </div>
-            </div>
+            <span>PRESS PHYSICAL VOLUME KEYS TO COUNT</span>
+            <span className="text-[9px] text-[#818cf8] font-bold tracking-normal leading-normal select-none">
+              (Click inside this screen once to enable focus)
+            </span>
           </motion.div>
-        ) : (
-          /* MINIMAL ACTIVE SCREEN: STYLISH PORTRAIT TEXT & STEP INPUT ONLY */
+        </div>
+      </main>
+
+      {/* SECURE FOOTER BAR (Reset option & secure status indicator) */}
+      <footer 
+        className="w-full max-w-sm mx-auto flex justify-between items-center text-[10px] font-mono text-white/30 z-20 border-t border-white/5 pt-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+          <span>KEYS CONNECTED</span>
+        </div>
+        
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            initAudioFeedback();
+            handleReset();
+          }}
+          className="hover:text-rose-400 active:scale-95 transition-all uppercase tracking-widest font-black px-3 py-1.5 selection:bg-transparent cursor-pointer hover:bg-white/5 rounded-xl border border-white/5 active:bg-rose-500/10 active:border-rose-500/20 text-[9px]"
+        >
+          Reset
+        </button>
+      </footer>
+
+      {/* ANDROID MANIFEST & NATIVE INTERCEPT INTEGRATION GUIDE DIALOG */}
+      <AnimatePresence>
+        {showAndroidGuide && (
           <motion.div
-            key="counter-panel"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-grow flex flex-col justify-between h-full w-full"
+            className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setShowAndroidGuide(false)}
           >
-            {/* TOP HEADER STEP CONTROLLER */}
-            <header 
-              className="w-full max-w-sm mx-auto flex justify-center z-20"
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
               onClick={(e) => e.stopPropagation()}
+              className="bg-[#0f172a] border border-white/10 w-full max-w-lg rounded-3xl p-6 shadow-2xl flex flex-col gap-5 overflow-hidden max-h-[85vh]"
             >
-              <div className="flex items-center gap-3 px-5 py-2 bg-white/5 border border-white/10 rounded-2xl shadow-xl backdrop-blur-2xl">
-                <label htmlFor="increment-step-input" className="text-xs font-mono text-white/40 uppercase font-black tracking-widest whitespace-nowrap">
-                  Count Step:
-                </label>
-                <input
-                  id="increment-step-input"
-                  type="number"
-                  value={step}
-                  onChange={(e) => {
-                    const val = Math.max(1, parseInt(e.target.value) || 1);
-                    setStep(val);
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-16 bg-[#090d16]/60 border border-white/10 text-white font-mono font-black text-center focus:ring-1 focus:ring-white/30 focus:border-white/30 rounded-xl py-1 px-2.5 transition-all outline-none"
-                  min="1"
-                  title="Increment Step Amount"
-                />
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <div className="flex items-center gap-2 text-indigo-300">
+                  <Smartphone className="w-5 h-5" />
+                  <span className="font-bold text-sm tracking-wide uppercase">Native Android Guide</span>
+                </div>
+                <button
+                  onClick={() => setShowAndroidGuide(false)}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            </header>
 
-            {/* CORE MASSIVE DISPLAY (Absolutely no tap-to-count clicks) */}
-            <main 
-              className="flex-1 flex flex-col justify-center items-center select-none z-10 w-full relative"
-              title="Volume keys active. Press Volume Up to count up, Volume Down to count down."
-            >
-              <div className="absolute inset-0 bg-transparent pointer-events-none" />
-              
-              <div className="flex flex-col items-center justify-center pointer-events-none w-full px-4 text-center">
-                
-                {/* Dynamically clamped, multi-length resilient visual counter box */}
-                <div className="relative h-[25vh] md:h-[35vh] flex items-center justify-center overflow-hidden w-full max-w-full">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.div
-                      key={value}
-                      initial={{ opacity: 0, y: 70, scale: 0.85 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -70, scale: 0.85 }}
-                      transition={{ type: "spring", stiffness: 220, damping: 25 }}
-                      style={{ fontSize: getFontSize(value) }}
-                      className="absolute font-mono font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.12)] selection:bg-transparent leading-none"
-                    >
-                      {value}
-                    </motion.div>
-                  </AnimatePresence>
+              {/* Scrollable instructions */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 font-sans text-xs text-white/70 leading-relaxed scrollbar-thin">
+                <div>
+                  <h3 className="font-bold text-white text-sm mb-1 flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+                    Why "Grant Permission" was quiet
+                  </h3>
+                  <p>
+                    On standard browsers (like Chrome or Safari) and inside iframes, security guidelines do not have a standard "Volume Up/Down OS Permission" dialog. By default, browsers prevent any code from capturing keys or playing audio until you touch/click inside the page. 
+                  </p>
                 </div>
 
-                {/* Tactile Assistive User Cue */}
-                <motion.div 
-                  animate={{ opacity: [0.35, 0.7, 0.35] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="text-[10px] sm:text-xs font-mono tracking-[0.2em] text-white/35 uppercase font-black text-center mt-6"
-                >
-                  PRESS PHYSICAL VOLUME KEYS TO COUNT
-                </motion.div>
-              </div>
-            </main>
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-2">
+                  <h4 className="font-bold text-white text-xs flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                    <Keyboard className="w-4 h-4 text-emerald-400" />
+                    How to test in browser
+                  </h4>
+                  <p>
+                    Simply **click once anywhere inside the tally screen** of the preview window. This shifts the browser keyboard focus to your application and instantly enables tactile audio and haptic feedback. Then, press your physical volume buttons to increment or decrement the counter!
+                  </p>
+                </div>
 
-            {/* SECURE FOOTER BAR (Reset option & secure status indicator) */}
-            <footer 
-              className="w-full max-w-sm mx-auto flex justify-between items-center text-[10px] font-mono text-white/30 z-20 border-t border-white/5 pt-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                <span>INTERCEPT LIVE</span>
+                <div>
+                  <h3 className="font-bold text-white text-sm mb-1">
+                    How it works in a Real Android App
+                  </h3>
+                  <p>
+                    When you run this inside a hybrid wrapper app (like **Capacitor / Cordova / WebView**) or build a Native Android Wrapper, you don't need any special user prompt! Instead, you set a manifest entry and override the default physical volume controller.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <span className="font-bold text-white/90 text-xs block font-mono">1. AndroidManifest.xml Entry:</span>
+                    <p className="text-[11px] text-white/50">
+                      Standard web apps don't need a specific manifest entry to listen to general keydown events, but a Native Android activity intercept is declared like this:
+                    </p>
+                    <pre className="bg-[#020617] border border-white/5 text-[10px] text-indigo-200 p-2.5 rounded-xl font-mono overflow-x-auto w-full">
+{`<activity 
+  android:name=".MainActivity"
+  android:configChanges="orientation|screenSize|keyboardHidden">
+</activity>`}
+                    </pre>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="font-bold text-white/90 text-xs block font-mono">2. MainActivity App Override (Java/Kotlin):</span>
+                    <p className="text-[11px] text-white/50">
+                      To fully intercept the volume buttons in your wrapper and prevent the Android OS Volume HUD Slider from appearing on screen, you override standard volume events like this:
+                    </p>
+                    <pre className="bg-[#020617] border border-white/5 text-[10px] text-emerald-200 p-2.5 rounded-xl font-mono overflow-x-auto w-full">
+{`@Override
+public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+        // Increment command sent to your code
+        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {'key':'VolumeUp'}));", null);
+        return true; // Prevents the OS volume bar from showing
+    } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+        // Decrement command sent to your code
+        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {'key':'VolumeDown'}));", null);
+        return true; // Prevents the OS volume bar from showing
+    }
+    return super.onKeyDown(keyCode, event);
+}`}
+                    </pre>
+                  </div>
+                </div>
               </div>
-              
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReset();
-                }}
-                className="hover:text-rose-400 active:scale-95 transition-all uppercase tracking-widest font-black px-3 py-1.5 selection:bg-transparent cursor-pointer hover:bg-white/5 rounded-xl border border-white/5 active:bg-rose-500/10 active:border-rose-500/20 text-[9px]"
-              >
-                Reset
-              </button>
-            </footer>
+
+              <div className="border-t border-white/5 pt-3 flex justify-end">
+                <button
+                  onClick={() => setShowAndroidGuide(false)}
+                  className="bg-white text-[#090d16] font-bold text-xs uppercase px-5 py-2.5 rounded-xl cursor-pointer hover:bg-zinc-100 transition-all"
+                >
+                  Got It, Thanks!
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
